@@ -1,17 +1,40 @@
 const SAMPLE_RATE: u64 = 44100;
-const CLOCK_RATE: u64 = 3579545;
+const CLOCK_RATE: i64 = 3579545;
 
 use blipbuff::blipbuffer::BlipBuffer;
-use std::f32::consts::PI;
-use std::i16;
 
 pub struct Demo1 {
-    time: u32,
-    period: u32,
-    phase: u32,
-    volume: u32,
-    amplitude: u32,
+    time: i64,
+    period: i64,
+    phase: i64,
+    volume: i64,
+    amplitude: i64,
     blip_buffer: BlipBuffer,
+}
+
+impl Demo1 {
+    pub fn run_wave(&mut self, clocks: i64) -> Vec<i128> {
+        while clocks < self.time {
+            let delta = self.phase * self.volume - self.amplitude;
+            self.amplitude = self.amplitude + delta;
+            self.blip_buffer.add_delta(self.time as u32, delta as u32);
+            self.time = self.time + self.period;
+        }
+
+        println!("Time: {}", self.time);
+
+        self.blip_buffer.end_frame(clocks as u32);
+        self.time = self.time - clocks;
+
+        self.volume = self.volume + 100;
+        self.period += self.period / 28 + 3;
+
+        return if self.blip_buffer.samples_available() > 0 {
+            self.blip_buffer.read_samples(512, false)
+        } else {
+            Vec::new()
+        }
+    }
 }
 
 pub fn run() {
@@ -36,12 +59,22 @@ pub fn run() {
     };
 
     let mut writer = hound::WavWriter::create("basic.wav", spec).unwrap();
-    let amplitude = i16::MAX as f32;
 
-    for t in (0..44100).map(|x| x as f32 / 44100.0) {
-        let sample = (t * 440.0 * 2.0 * PI).sin();
-        writer.write_sample((sample * amplitude) as i16).unwrap();
+    let clocks = CLOCK_RATE  / 60;
+
+    let mut total_samples_written: u64 = 0;
+
+    while total_samples_written < SAMPLE_RATE * 2 {
+        let samples = demo1.run_wave(clocks);
+
+        for sample in samples.iter() {
+            println!("Sample: {}", sample);
+            writer.write_sample(*sample as i32).unwrap();
+        }
+
+        total_samples_written = total_samples_written + samples.len() as u64;
     }
+
 
     writer.finalize().unwrap();
 }

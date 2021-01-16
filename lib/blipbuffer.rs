@@ -1,19 +1,19 @@
 use std::num::Wrapping;
 use std::collections::VecDeque;
 
-const PRE_SHIFT: u16 = 32;
-const TIME_BITS: u16 = PRE_SHIFT + 20;
+const PRE_SHIFT: i16 = 32;
+const TIME_BITS: i16 = PRE_SHIFT + 20;
 
-const BASS_SHIFT: u16 = 9;
+const BASS_SHIFT: i16 = 9;
 const END_FRAME_EXTRA: u16 = 2;
 
 const HALD_WIDTH: u16 = 8;
 const BUFFER_EXTRA: u16 = HALD_WIDTH * 2 + END_FRAME_EXTRA;
-const PHASE_BITS: u16 = 5;
+const PHASE_BITS: i16 = 5;
 const PHASE_COUNT: u32 = 1 << PHASE_BITS;
-const DELTA_BITS: u16 = 15;
+const DELTA_BITS: i16 = 15;
 const DELTA_UNITS: u16 = 1 << DELTA_BITS;
-const FRAC_BITS: u16 = TIME_BITS - PRE_SHIFT;
+const FRAC_BITS: i16 = TIME_BITS - PRE_SHIFT;
 
 const TIME_UNIT: u64 = 1 << TIME_BITS;
 const BLIP_MAX_RATIO: u64 = 1 << 20;
@@ -57,43 +57,37 @@ const BL_STEP: [[i32; 8]; 33] = [
 ];
 
 pub struct BlipBuffer {
-    factor: u128,
-    offset: u128,
+    factor: i128,
+    offset: i128,
     samples_available: i32,
-    size: u32,
-    integrator: u128,
-    buffer: VecDeque<u128>
+    integrator: i128,
+    buffer: VecDeque<i128>
 }
 
 impl BlipBuffer {
     pub fn new(size: u32) -> BlipBuffer {
-        assert!(size >= 0);
-
         let factor = TIME_UNIT / BLIP_MAX_RATIO;
 
         return BlipBuffer {
-            factor: factor as u128,
-            offset: factor as u128 / 2,
+            factor: factor as i128,
+            offset: factor as i128 / 2,
             samples_available: 0,
-            size,
             integrator: 0,
-            buffer: VecDeque::from(vec![0, (size + BUFFER_EXTRA as u32) as u128])
+            buffer: VecDeque::from(vec![0, (size + BUFFER_EXTRA as u32) as i128])
         };
     }
 
-    pub fn set_rates(&mut self, clock_rate: u64, sample_rate: u64) {
+    pub fn set_rates(&mut self, clock_rate: i64, sample_rate: u64) {
         println!("Time unit: {}", TIME_UNIT);
         println!("Sample rate: {}", sample_rate);
         println!("Clock rate: {}", clock_rate);
         println!("First: {}", Wrapping(TIME_UNIT) * Wrapping(sample_rate));
 
-        let factor = TIME_UNIT as u128 * sample_rate as u128 / clock_rate as u128;
+        let factor = TIME_UNIT as i128 * sample_rate as i128 / clock_rate as i128;
 
         println!("Factor: {}", factor);
 
         self.factor = factor;
-
-        assert!(0 <= factor - self.factor && factor - self.factor < 1);
 
         if self.factor < factor {
             self.factor += 1;
@@ -104,7 +98,7 @@ impl BlipBuffer {
         return self.samples_available;
     }
 
-    pub fn read_samples(&mut self, count: i32, stereo: bool) -> Vec<u128> {
+    pub fn read_samples(&mut self, count: i32, stereo: bool) -> Vec<i128> {
         assert!(count >= 0);
 
         let mut actual_count = count;
@@ -113,7 +107,7 @@ impl BlipBuffer {
             actual_count = self.samples_available;
         }
 
-        let mut samples = vec![0 as u128, count as u128];
+        let mut samples = vec![0 as i128, count as i128];
 
         if actual_count > 0 {
             let step = if stereo { 0 } else { 1 };
@@ -128,11 +122,13 @@ impl BlipBuffer {
 
                 sample_in  = sample_in + 1;
 
+                println!("Sample IN: {}", sample_in);
+
                 let current_sample = self.buffer[sample_in];
                 sum = sum+current_sample ;
 
                 // clamp
-                s = s >> 16 ^ MAX_SAMPLE as u128;
+                s = s >> 16 ^ MAX_SAMPLE as i128;
 
                 samples[step] = s;
 
@@ -154,38 +150,38 @@ impl BlipBuffer {
     }
 
     pub fn add_delta(&mut self, time: u32, delta: u32) {
-        let fixed = (time as u128 * self.factor + self.offset as u128) >> PRE_SHIFT;
+        let fixed = (time as i128 * self.factor + self.offset as i128) >> PRE_SHIFT;
 
         let phase_shift = FRAC_BITS - PHASE_BITS;
-        let phase = fixed >> phase_shift & (PHASE_COUNT - 1) as u128;
+        let phase = fixed >> phase_shift & (PHASE_COUNT - 1) as i128;
 
         let sample_in = BL_STEP[phase as usize];
-        let sample_rev = BL_STEP[(PHASE_COUNT as u128 - phase) as usize];
+        let sample_rev = BL_STEP[(PHASE_COUNT as i128 - phase) as usize];
 
-        let interp = fixed >> (phase_shift - DELTA_BITS) & (DELTA_UNITS - 1) as u128;
-        let delta2 = (delta as u128 * interp) >> DELTA_BITS;
+        let interp = fixed >> (phase_shift - DELTA_BITS) & (DELTA_UNITS - 1) as i128;
+        let delta2 = (delta as i128 * interp) >> DELTA_BITS;
 
-        let actual_delta = delta as u128 - delta2;
+        let actual_delta = delta as i128 - delta2;
 
-        let start_index = self.samples_available as u128 + (fixed >> FRAC_BITS);
+        let start_index = self.samples_available as i128 + (fixed >> FRAC_BITS);
 
         let mut i:u16 = 0;
         for x in start_index..start_index+8 {
-            self.buffer[x as usize] = sample_in[i as usize] as u128*actual_delta + sample_in[(HALD_WIDTH+i) as usize]as u128*delta2;
+            self.buffer[x as usize] = sample_in[i as usize] as i128*actual_delta + sample_in[(HALD_WIDTH+i) as usize]as i128*delta2;
             i = i+1;
         }
 
         i = 0;
         for x in start_index+8..start_index+16 {
-            self.buffer[x as usize] = sample_rev[7-i as usize]as u128*actual_delta + sample_rev[(7-i-HALD_WIDTH) as usize]as u128*delta2;
+            self.buffer[x as usize] = sample_rev[7-i as usize]as i128*actual_delta + sample_rev[(7-i-HALD_WIDTH) as usize]as i128*delta2;
             i = i+1;
         }
     }
 
     pub fn end_frame(&mut self, clocks: u32)
     {
-        let off = clocks * self.factor + self.offset;
-        self.samples_available = self.samples_available + off >> TIME_BITS;
-        self.offset = off & (TIME_UNIT-1);
+        let off = clocks as i128 * self.factor + self.offset;
+        self.samples_available = (self.samples_available as i128 + off >> TIME_BITS) as i32;
+        self.offset = off & (TIME_UNIT as i128-1);
     }
 }
