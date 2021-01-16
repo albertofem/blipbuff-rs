@@ -1,0 +1,9 @@
+[package]
+name = "blipbuff"
+version = "1.0.0"
+authors = ["Alberto Fernández <albertofem@gmail.com>"]
+license = "GPL"
+repository = "https://github.com/albertofem/blipbuff-rs"
+
+[lib]
+path = "lib.rs"

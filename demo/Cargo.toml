@@ -1,0 +1,15 @@
+[package]
+name = "blipbuff-demo"
+version = "1.0.0"
+authors = ["Alberto Fernández <albertofem@gmail.com>"]
+license = "GPL"
+
+[dependencies]
+hound = "*"
+clap = "*"
+blipbuff = { path ="../lib" }
+
+[[bin]]
+doc = false
+name = "blipbuff-demo"
+path = "demo.rs"
