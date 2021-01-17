@@ -8,6 +8,7 @@ license = "GPL"
 hound = "*"
 clap = "*"
 blipbuff = { path ="../lib" }
+unwrap = "1.2.1"
 
 [[bin]]
 doc = false

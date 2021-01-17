@@ -3,6 +3,7 @@ mod basic;
 extern crate blipbuff;
 extern crate clap;
 extern crate hound;
+extern crate unwrap;
 
 use clap::{App, Arg};
 

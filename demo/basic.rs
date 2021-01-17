@@ -1,52 +1,56 @@
-const SAMPLE_RATE: u64 = 44100;
-const CLOCK_RATE: i64 = 3579545;
+const SAMPLE_RATE: i128 = 44100;
+const CLOCK_RATE: i128 = 3579545;
 
 use blipbuff::blipbuffer::BlipBuffer;
+use unwrap::unwrap;
 
 pub struct Demo1 {
-    time: i64,
-    period: i64,
-    phase: i64,
-    volume: i64,
-    amplitude: i64,
+    time: i128,
+    period: i128,
+    phase: i128,
+    volume: i128,
+    amplitude: i128,
     blip_buffer: BlipBuffer,
 }
 
 impl Demo1 {
-    pub fn run_wave(&mut self, clocks: i64) -> Vec<i128> {
-        while clocks < self.time {
+    pub fn run_wave(&mut self, clocks: i128) {
+        while self.time < clocks {
             let delta = self.phase * self.volume - self.amplitude;
             self.amplitude = self.amplitude + delta;
-            self.blip_buffer.add_delta(self.time as u32, delta as u32);
+            self.blip_buffer.add_delta(self.time, delta);
+            self.phase = -1 * self.phase;
             self.time = self.time + self.period;
         }
+    }
 
-        println!("Time: {}", self.time);
-
-        self.blip_buffer.end_frame(clocks as u32);
+    pub fn end_wave(&mut self, clocks: i128) {
+        self.blip_buffer.end_frame(clocks);
         self.time = self.time - clocks;
+    }
 
+    pub fn modify_wave(&mut self) {
         self.volume = self.volume + 100;
-        self.period += self.period / 28 + 3;
+        self.period = self.period + (self.period / 28 + 3);
+    }
 
-        return if self.blip_buffer.samples_available() > 0 {
-            self.blip_buffer.read_samples(512, false)
-        } else {
-            Vec::new()
-        }
+    pub fn samples_available(&mut self) -> bool {
+        return self.blip_buffer.samples_available() > 0;
+    }
+
+    pub fn read_samples(&mut self, count: i128) -> (i128, Vec<i128>) {
+        self.blip_buffer.read_samples(count, false)
     }
 }
 
 pub fn run() {
-    println!("Running demo basic");
-
     let mut demo1 = Demo1 {
         time: 0,
         period: 1,
         phase: 1,
         volume: 0,
         amplitude: 0,
-        blip_buffer: BlipBuffer::new((SAMPLE_RATE / 10) as u32),
+        blip_buffer: BlipBuffer::new(SAMPLE_RATE / 10),
     };
 
     demo1.blip_buffer.set_rates(CLOCK_RATE, SAMPLE_RATE);
@@ -59,22 +63,31 @@ pub fn run() {
     };
 
     let mut writer = hound::WavWriter::create("basic.wav", spec).unwrap();
+    let mut total_samples_written: i128 = 0;
 
-    let clocks = CLOCK_RATE  / 60;
+    while total_samples_written < (SAMPLE_RATE * 2) {
+        let clocks = CLOCK_RATE / 60;
 
-    let mut total_samples_written: u64 = 0;
+        demo1.run_wave(clocks);
+        demo1.end_wave(clocks);
 
-    while total_samples_written < SAMPLE_RATE * 2 {
-        let samples = demo1.run_wave(clocks);
+        while demo1.samples_available() {
+            let (read_count, samples) = demo1.read_samples(512);
 
-        for sample in samples.iter() {
-            println!("Sample: {}", sample);
-            writer.write_sample(*sample as i32).unwrap();
+            for sample in samples.iter() {
+                //println!("Sample: {}", sample);
+                unwrap!(
+                    writer.write_sample(*sample as i16),
+                    "Unable to write sample: {}",
+                    sample
+                );
+            }
+
+            total_samples_written = total_samples_written + read_count as i128;
         }
 
-        total_samples_written = total_samples_written + samples.len() as u64;
+        demo1.modify_wave();
     }
-
 
     writer.finalize().unwrap();
 }
