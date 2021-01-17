@@ -95,10 +95,10 @@ impl BlipBuffer {
             actual_count = self.samples_available;
         }
 
-        let mut samples = vec![0; (actual_count as usize) * 2];
+        let mut samples = vec![0; actual_count as usize];
 
         if actual_count > 0 {
-            let step = if stereo { 2 } else { 1 };
+            let step = if stereo { 2 } else { 0 };
 
             let mut sum = self.integrator;
 
@@ -149,6 +149,7 @@ impl BlipBuffer {
             self.buffer[x as usize] =
                 sample_in[i as usize] * actual_delta + sample_in_half[i as usize] * delta2;
             i = i + 1;
+            println!("Buffer: {}", self.buffer[x as usize]);
         }
 
         i = 7;
@@ -156,6 +157,7 @@ impl BlipBuffer {
             self.buffer[x as usize] =
                 sample_rev[i as usize] * actual_delta + sample_rev_half[i as usize] * delta2;
             i = i - 1;
+            println!("Buffer: {}", self.buffer[x as usize]);
         }
     }
 
