@@ -1,8 +1,10 @@
 mod basic;
+mod chip;
 
 extern crate blipbuff;
 extern crate clap;
 extern crate hound;
+extern crate text_io;
 extern crate unwrap;
 
 use clap::{App, Arg};
@@ -24,6 +26,7 @@ fn main() {
 
     match demo_name {
         "basic" => basic::run(),
+        "chip" => chip::run(),
         _ => println!("Invalid demo name. Exiting..."),
     }
 

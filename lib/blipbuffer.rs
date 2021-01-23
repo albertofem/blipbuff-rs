@@ -107,7 +107,8 @@ impl BlipBuffer {
             self.integrator = sum;
 
             self.buffer.drain(0..actual_count as usize);
-            self.buffer.append(&mut vec![0 as i128; actual_count as usize]);
+            self.buffer
+                .append(&mut vec![0 as i128; actual_count as usize]);
 
             self.samples_available -= actual_count;
         }
