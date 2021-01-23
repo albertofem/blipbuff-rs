@@ -2,14 +2,11 @@ const PRE_SHIFT: i128 = 32;
 const TIME_BITS: i128 = PRE_SHIFT + 20;
 
 const BASS_SHIFT: i128 = 9;
-const END_FRAME_EXTRA: i128 = 2;
 
-const HALF_WIDTH: i128 = 8;
-const BUFFER_EXTRA: i128 = HALF_WIDTH * 2 + END_FRAME_EXTRA;
 const PHASE_BITS: i128 = 5;
 const PHASE_COUNT: i128 = 1 << PHASE_BITS;
 const DELTA_BITS: i128 = 15;
-const DELTA_UNITS: i128 = 1 << DELTA_BITS;
+const DELTA_UNIT: i128 = 1 << DELTA_BITS;
 const FRAC_BITS: i128 = TIME_BITS - PRE_SHIFT;
 
 const TIME_UNIT: i128 = 1 << TIME_BITS;
@@ -65,21 +62,15 @@ impl BlipBuffer {
 
         return BlipBuffer {
             factor,
-            offset: factor / 2,
+            offset: 0,
             samples_available: 0,
             integrator: 0,
-            buffer: Vec::from(vec![0; (size + BUFFER_EXTRA) as usize]),
+            buffer: Vec::from(vec![0; size as usize]),
         };
     }
 
     pub fn set_rates(&mut self, clock_rate: i128, sample_rate: i128) {
-        let factor = TIME_UNIT * sample_rate / clock_rate;
-
-        self.factor = factor;
-
-        if self.factor < factor {
-            self.factor += 1;
-        }
+        self.factor = TIME_UNIT * sample_rate / clock_rate;
     }
 
     pub fn samples_available(&mut self) -> i128 {
@@ -107,20 +98,18 @@ impl BlipBuffer {
 
                 let current_sample = self.buffer[x as usize];
 
-                sum = sum + current_sample;
+                sum += current_sample;
+                sum -= s << (DELTA_BITS - BASS_SHIFT);
 
                 samples[(x + step) as usize] = s;
-
-                sum = sum - (s << (DELTA_BITS - BASS_SHIFT));
             }
 
             self.integrator = sum;
 
             self.buffer.drain(0..actual_count as usize);
-            let mut zeroed = vec![0 as i128; actual_count as usize];
-            self.buffer.append(&mut zeroed);
+            self.buffer.append(&mut vec![0 as i128; actual_count as usize]);
 
-            self.samples_available = self.samples_available - actual_count;
+            self.samples_available -= actual_count;
         }
 
         return (actual_count, samples);
@@ -137,7 +126,7 @@ impl BlipBuffer {
         let sample_rev = BL_STEP[(PHASE_COUNT - phase) as usize];
         let sample_rev_half = BL_STEP[((PHASE_COUNT - phase) - 1) as usize];
 
-        let interp = fixed >> (phase_shift - DELTA_BITS) & (DELTA_UNITS - 1);
+        let interp = fixed >> (phase_shift - DELTA_BITS) & (DELTA_UNIT - 1);
         let delta2 = (delta * interp) >> DELTA_BITS;
 
         let actual_delta = delta - delta2;
@@ -146,18 +135,16 @@ impl BlipBuffer {
 
         let mut i: i128 = 0;
         for x in start_index..start_index + 8 {
-            self.buffer[x as usize] =
+            self.buffer[x as usize] +=
                 sample_in[i as usize] * actual_delta + sample_in_half[i as usize] * delta2;
             i = i + 1;
-            println!("Buffer: {}", self.buffer[x as usize]);
         }
 
         i = 7;
         for x in start_index + 8..start_index + 16 {
-            self.buffer[x as usize] =
+            self.buffer[x as usize] +=
                 sample_rev[i as usize] * actual_delta + sample_rev_half[i as usize] * delta2;
             i = i - 1;
-            println!("Buffer: {}", self.buffer[x as usize]);
         }
     }
 

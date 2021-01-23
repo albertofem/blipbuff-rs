@@ -20,18 +20,18 @@ impl Demo1 {
             self.amplitude = self.amplitude + delta;
             self.blip_buffer.add_delta(self.time, delta);
             self.phase = -1 * self.phase;
-            self.time = self.time + self.period;
+            self.time += self.period;
         }
     }
 
     pub fn end_wave(&mut self, clocks: i128) {
         self.blip_buffer.end_frame(clocks);
-        self.time = self.time - clocks;
+        self.time -= clocks;
     }
 
     pub fn modify_wave(&mut self) {
-        self.volume = self.volume + 100;
-        self.period = self.period + (self.period / 28 + 3);
+        self.volume += 100;
+        self.period += self.period / 28 + 3;
     }
 
     pub fn samples_available(&mut self) -> bool {
@@ -75,7 +75,6 @@ pub fn run() {
             let (read_count, samples) = demo1.read_samples(512);
 
             for sample in samples.iter() {
-                //println!("Sample: {}", sample);
                 unwrap!(
                     writer.write_sample(*sample as i16),
                     "Unable to write sample: {}",
