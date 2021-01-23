@@ -141,9 +141,12 @@ impl Channel {
     fn run_triangle(&mut self, blip_buffer: &mut BlipBuffer, end_time: i128) {
         while self.time < end_time {
             self.time += self.registers.period;
-            self.phase = (self.phase + 1) % 32;
-            let delta = self.update_amplitude(if self.phase < 16 { self.phase } else { 31 - self.phase});
-            blip_buffer.add_delta(self.time, delta);
+
+            if self.registers.volume != 0 {
+                self.phase = (self.phase + 1) % 32;
+                let delta = self.update_amplitude(if self.phase < 16 { self.phase } else { 31 - self.phase });
+                blip_buffer.add_delta(self.time, delta);
+            }
         }
     }
 
